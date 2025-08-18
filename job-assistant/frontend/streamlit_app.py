@@ -14,11 +14,17 @@ st.set_page_config(
 )
 
 # Title and Intro 
-st.title("🤖 AI Research Assistant for JobSeekers")
+st.markdown(
+    "<h1 style='color: lightgreen;'>🤖 AI Research Assistant for JobSeekers</h1>",
+    unsafe_allow_html=True
+)
 st.markdown("Upload your resume, choose your target role, and get personalized insights!")
 
 # Sidebar
-st.sidebar.header("⚙️ Settings")
+st.sidebar.markdown(
+    "<h1 style='color: lightblue;'>⚙️ Settings</h1>",
+    unsafe_allow_html=True
+    )
 role = st.sidebar.text_input("Target Role", placeholder="e.g., Data Scientist")
 tone = st.sidebar.selectbox("Report Tone", ["Professional", "Friendly", "Concise"])
 experience_level = st.sidebar.selectbox("Experience Level", ["Entry", "Mid", "Senior"])
@@ -58,19 +64,20 @@ if st.button("🚀 Run Analysis") and uploaded_file and role:
         )
 
         # Output Display
-        st.subheader("📊 Resume Analysis Results")
-        st.metric("Target Role", role)
-        st.metric("Match Score", f"{res.match_score}%") 
-        st.metric("Session ID", st.session_state.session_id)
+        with st.expander("🏁 Resume Analysis Results"):
+            st.subheader("📊 Resume Analysis Results")
+            st.metric("Target Role", role)
+            st.metric("Match Score", f"{res.match_score}%") 
+            st.metric("Session ID", st.session_state.session_id)
 
-        st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
-        st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
+            st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
+            st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
 
-        st.write("💡 **Recommendations:**")
-        for rec in res.recommendations:
-            st.write(f"- {rec}")
+            st.write("💡 **Recommendations:**")
+            for rec in res.recommendations:
+                st.write(f"- {rec}")
 
-        st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
+            st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
 
         with st.expander("👨‍💻 Agent Logs"):
             st.json({

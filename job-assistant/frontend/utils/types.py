@@ -8,7 +8,7 @@ class AnalyzeRequest(BaseModel):
     experience_level: str
     session_id: str
 
-class AnalayzeResponse(BaseModel):
+class AnalyzeResponse(BaseModel):
     match_score: int
     matched_skills: List[str]
     missing_skills: List[str]
