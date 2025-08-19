@@ -1,95 +1,223 @@
 import os
-import uuid 
+import io
+import uuid
 import requests
 import streamlit as st
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
 from utils.parser import parse_resume
 from utils.config import get_backend_url
 from utils.types import AnalyzeRequest, AnalyzeResponse
 
 
-# Page Config
+# --------------------------
+# Page Configuration
+# --------------------------
 st.set_page_config(
-    page_title= "Jobbie AI",
+    page_title="Jobbie AI",
     page_icon="🤖",
     layout="wide"
 )
 
-# Title and Intro 
+
+# --------------------------
+# Clear Session Button
+# --------------------------
+if st.sidebar.button("🧹 Clear Session"):
+    st.session_state.clear()
+    st.session_state["session_cleared"] = True
+    st.rerun()
+
+
+# --------------------------
+# Title and Intro
+# --------------------------
 st.markdown(
-    "<h1 style='color: lightgreen;'>🤖 AI Research Assistant for JobSeekers</h1>",
+    "<h1 style='color: lightblue;'>🤖 AI Research Assistant for JobSeekers</h1>",
     unsafe_allow_html=True
 )
 st.markdown("Upload your resume, choose your target role, and get personalized insights!")
 
-# Sidebar
+
+# --------------------------
+# Show Clear Session Message
+# --------------------------
+if "session_cleared" in st.session_state:
+    st.success("✅ Session has been cleared successfully.")
+    del st.session_state["session_cleared"]
+
+
+# --------------------------
+# Sidebar Settings
+# --------------------------
 st.sidebar.markdown(
     "<h1 style='color: lightblue;'>⚙️ Settings</h1>",
     unsafe_allow_html=True
-    )
+)
 role = st.sidebar.text_input("Target Role", placeholder="e.g., Data Scientist")
 tone = st.sidebar.selectbox("Report Tone", ["Professional", "Friendly", "Concise"])
 experience_level = st.sidebar.selectbox("Experience Level", ["Entry", "Mid", "Senior"])
 
-# File Upload
+
+# --------------------------
+# File Upload & Session Setup
+# --------------------------
 uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
 backend_url = get_backend_url()
 
-# Session Handling
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-# Run Analysis Button
-if st.button("🚀 Run Analysis") and uploaded_file and role:
-    with st.spinner("Analyzing your resume..."):
-        resume_text = parse_resume(uploaded_file)
 
-        # Build Request
-        req = AnalyzeRequest(
-            resume_text=resume_text,
-            target_role=role,
-            tone=tone,
-            experience_level=experience_level,
-            session_id=st.session_state.session_id
-        )
+# --------------------------
+# Resume Preview
+# --------------------------
+resume_text = None
+if uploaded_file:
+    resume_text = parse_resume(uploaded_file)
 
-        try:
-            # Send request to backend
-            response = requests.post(
-                f"{backend_url}/api/analyze-resume",
-                json=req.dict()
+    if resume_text.strip():
+        with st.expander("📄 Preview Extracted Resume Text", expanded=True):
+            st.text_area("Extracted Resume", resume_text[:5000], height=300)  # show max 5k chars
+            st.caption(f"📝 Extracted text length: {len(resume_text.split())} words")
+    else:
+        st.error("⚠️ Could not extract text from the uploaded resume. Please try another file.")
+
+
+# --------------------------
+# PDF Report Generator
+# --------------------------
+def generate_pdf_report(res: AnalyzeResponse, role: str, session_id: str) -> bytes:
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, "Jobbie AI - Resume Analysis Report")
+
+    # Metadata
+    c.setFont("Helvetica", 10)
+    c.drawString(50, height - 70, f"Target Role: {role}")
+    c.drawString(50, height - 85, f"Session ID: {session_id}")
+
+    # Match Score
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, height - 120, f"📊 Match Score: {res.match_score}%")
+
+    # Skills
+    c.setFont("Helvetica", 11)
+    y = height - 160
+    c.drawString(50, y, "✅ Matched Skills:")
+    y -= 15
+    for skill in res.matched_skills:
+        c.drawString(70, y, f"- {skill}")
+        y -= 15
+
+    y -= 10
+    c.drawString(50, y, "⚠️ Missing Skills:")
+    y -= 15
+    for skill in res.missing_skills:
+        c.drawString(70, y, f"- {skill}")
+        y -= 15
+
+    # Recommendations
+    y -= 10
+    c.drawString(50, y, "💡 Recommendations:")
+    y -= 15
+    for rec in res.recommendations:
+        c.drawString(70, y, f"- {rec}")
+        y -= 15
+
+    # Hashtags
+    y -= 10
+    c.drawString(50, y, "📌 Suggested Hashtags:")
+    y -= 15
+    c.drawString(70, y, " ".join(res.hashtags))
+
+    # Footer
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawString(50, 40, "Generated by Jobbie AI")
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+# --------------------------
+# Run Analysis
+# --------------------------
+if st.button("🚀 Run Analysis"):
+    # Guard Clauses
+    if not uploaded_file:
+        st.error("‼️ Please upload a resume file before running analysis.")
+    elif not role:
+        st.error("‼️ Please enter a target role in the sidebar before running analysis.")
+    elif not resume_text or not resume_text.strip():
+        st.error("⚠️ Resume text is empty. Try uploading a different file.")
+    else:
+        # Proceed with analysis
+        with st.spinner("Analyzing your resume..."):
+            req = AnalyzeRequest(
+                resume_text=resume_text,
+                target_role=role,
+                tone=tone,
+                experience_level=experience_level,
+                session_id=st.session_state.session_id
             )
-            response.raise_for_status()
-            data = response.json()
 
-            # Parse response
-            res = AnalyzeResponse(**data)
+            try:
+                response = requests.post(
+                    f"{backend_url}/api/analyze-resume",
+                    json=req.dict()
+                )
+                response.raise_for_status()
+                data = response.json()
 
-            # Output Display
-            with st.expander("🏁 Resume Analysis Results"):
-                st.subheader("📊 Resume Analysis Results")
-                st.metric("Target Role", role)
-                st.metric("Match Score", f"{res.match_score}%") 
-                st.metric("Session ID", st.session_state.session_id)
+                res = AnalyzeResponse(**data)
 
-                st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
-                st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
+                # --------------------------
+                # Results Display
+                # --------------------------
+                with st.expander("🏁 Resume Analysis Results", expanded=True):
+                    st.subheader("📊 Resume Analysis Results")
+                    st.metric("Target Role", role)
+                    st.metric("Match Score", f"{res.match_score}%")
+                    st.metric("Session ID", st.session_state.session_id)
 
-                st.write("💡 **Recommendations:**")
-                for rec in res.recommendations:
-                    st.write(f"- {rec}")
+                    st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
+                    st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
 
-                st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
+                    st.write("💡 **Recommendations:**")
+                    for rec in res.recommendations:
+                        st.write(f"- {rec}")
 
-            with st.expander("👨‍💻 Agent Logs"):
-                st.json({
-                    "TrendHunter": "Analyzed job market data.",
-                    "ResumeAnalyzer": "Extracted skills and experience.",
-                    "GapFinder": "Detected missing skills.",
-                    "Advisor": "Generated personalized recommendations."
-                })
+                    st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
 
-        except requests.exceptions.RequestException as e:
-            st.error(f"‼️ Error contacting backend: {e}")
+                    # --- Download Report Button ---
+                    pdf_bytes = generate_pdf_report(res, role, st.session_state.session_id)
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_bytes,
+                        file_name=f"jobbie_ai_resume_analysis_{st.session_state.session_id}.pdf",
+                        mime="application/pdf"
+                    )
 
+                with st.expander("👨‍💻 Agent Logs"):
+                    st.json({
+                        "TrendHunter": "Analyzed job market data.",
+                        "ResumeAnalyzer": "Extracted skills and experience.",
+                        "GapFinder": "Detected missing skills.",
+                        "Advisor": "Generated personalized recommendations."
+                    })
+
+            except requests.exceptions.RequestException as e:
+                st.error(f"‼️ Error contacting backend: {e}")
+
+
+# --------------------------
+# Initial Info
+# --------------------------
 elif not uploaded_file:
-    st.info("Please upload your resume to begin analysis.")
+    st.info("📂 Please upload your resume to begin analysis.")
