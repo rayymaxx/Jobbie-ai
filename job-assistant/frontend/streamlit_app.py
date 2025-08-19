@@ -2,6 +2,7 @@ import os
 import uuid 
 import requests
 import streamlit as st
+from utils.parser import parse_resume
 from utils.config import get_backend_url
 from utils.types import AnalyzeRequest, AnalyzeResponse
 
@@ -40,7 +41,7 @@ if "session_id" not in st.session_state:
 # Run Analysis Button
 if st.button("🚀 Run Analysis") and uploaded_file and role:
     with st.spinner("Analyzing your resume..."):
-        resume_text = uploaded_file.read().decode("latin-1", errors="ignore")
+        resume_text = parse_resume(uploaded_file)
 
         # Build Request
         req = AnalyzeRequest(
