@@ -1,6 +1,6 @@
 import os
 import uuid 
-import json 
+import requests
 import streamlit as st
 from utils.config import get_backend_url
 from utils.types import AnalyzeRequest, AnalyzeResponse
@@ -51,41 +51,44 @@ if st.button("🚀 Run Analysis") and uploaded_file and role:
             session_id=st.session_state.session_id
         )
 
-        # Mock Response (until wired backend)
-        res = AnalyzeResponse(
-            match_score=82,
-            matched_skills=["Python", "SQL", "Data Analysis"],
-            missing_skills=["Deep Learning", "MLOps"],
-            recommendations=[
-                "Consider adding hands-on projects with TensorFlow/PyTorch.",
-                "Highlight experience with cloud platforms like AWS/GCP."
-            ],
-            hashtags=["#DataScience", "#CareerGrowth", "AIJobs"]
-        )
+        try:
+            # Send request to backend
+            response = requests.post(
+                f"{backend_url}/api/analyze-resume",
+                json=req.dict()
+            )
+            response.raise_for_status()
+            data = response.json()
 
-        # Output Display
-        with st.expander("🏁 Resume Analysis Results"):
-            st.subheader("📊 Resume Analysis Results")
-            st.metric("Target Role", role)
-            st.metric("Match Score", f"{res.match_score}%") 
-            st.metric("Session ID", st.session_state.session_id)
+            # Parse response
+            res = AnalyzeResponse(**data)
 
-            st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
-            st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
+            # Output Display
+            with st.expander("🏁 Resume Analysis Results"):
+                st.subheader("📊 Resume Analysis Results")
+                st.metric("Target Role", role)
+                st.metric("Match Score", f"{res.match_score}%") 
+                st.metric("Session ID", st.session_state.session_id)
 
-            st.write("💡 **Recommendations:**")
-            for rec in res.recommendations:
-                st.write(f"- {rec}")
+                st.write("✅ **Matched Skills:**", ", ".join(res.matched_skills))
+                st.write("⚠️ **Missing Skills:**", ", ".join(res.missing_skills))
 
-            st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
+                st.write("💡 **Recommendations:**")
+                for rec in res.recommendations:
+                    st.write(f"- {rec}")
 
-        with st.expander("👨‍💻 Agent Logs"):
-            st.json({
-                "TrendHunter": "Analyzed job market data.",
-                "ResumeAnalyzer": "Extracted skills and experience.",
-                "GapFinder": "Detected missing skills.",
-                "Advisor": "Generated personalized recommendations."
-            })
+                st.write("📌 Suggested Hashtags:", " ".join(res.hashtags))
+
+            with st.expander("👨‍💻 Agent Logs"):
+                st.json({
+                    "TrendHunter": "Analyzed job market data.",
+                    "ResumeAnalyzer": "Extracted skills and experience.",
+                    "GapFinder": "Detected missing skills.",
+                    "Advisor": "Generated personalized recommendations."
+                })
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"‼️ Error contacting backend: {e}")
 
 elif not uploaded_file:
     st.info("Please upload your resume to begin analysis.")

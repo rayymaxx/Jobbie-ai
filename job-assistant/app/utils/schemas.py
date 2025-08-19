@@ -3,10 +3,14 @@ from typing import List
 
 class AnalyzeRequest(BaseModel):
     resume_text: str
-    job_description: str
+    target_role: str
+    tone: str
+    experience_level: str
+    session_id: str
 
 class AnalyzeResponse(BaseModel):
-    resume_score: int
-    top_skills: List[str]
+    match_score: int
+    matched_skills: List[str]
     missing_skills: List[str]
-    advice: str
+    recommendations: List[str]
+    hashtags: List[str]

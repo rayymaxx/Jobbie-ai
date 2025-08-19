@@ -27,8 +27,12 @@ async def analyze_resume(payload: AnalyzeRequest):
     Temporary mock endpoint
     """
     return AnalyzeResponse(
-        resume_score=85,
-        top_skills=["Python", "Data Analysis", "Machine Learning"],
-        missing_skills=["Docker", "Kubernetes"],
-        advice="Great technical foundation. Add DevOps tools to align with industry trends."
+        match_score=85,
+        matched_skills=["Python", "SQL", "Data Analysis"],
+        missing_skills=["Deep Learning", "MLOps"],
+        recommendations=[
+            "Consider adding hands-on projects with TensorFlow/Pytorch"
+            "Highlight experience with cloud platforms like AWS/GCP"
+        ],
+        hashtags=["#DataScience", "#CareerGrowth", "#AIJobs"]
     )
